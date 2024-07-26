@@ -24,7 +24,7 @@
     const remoteVideo = document.getElementById('remoteVideo');
 
     function connect() {
-        socket = new WebSocket("ws://localhost:8080/signal");
+        socket = new WebSocket('ws://localhost:8080/signal');
 
         socket.onopen = function(event) {
             console.log("WebSocket connected");
