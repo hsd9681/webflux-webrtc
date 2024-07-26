@@ -1,0 +1,31 @@
+//package com.sparta.websockettest;
+//
+//import org.springframework.web.reactive.socket.WebSocketHandler;
+//import org.springframework.web.reactive.socket.WebSocketSession;
+//import reactor.core.publisher.Flux;
+//import reactor.core.publisher.Mono;
+//
+//import java.util.Map;
+//import java.util.concurrent.ConcurrentHashMap;
+//
+//public class SignalingWebSocketHandler implements WebSocketHandler {
+//
+//    private final Map<String, WebSocketSession> sessions = new ConcurrentHashMap<>();
+//
+//    @Override
+//    public Mono<Void> handle(WebSocketSession session) {
+//        String sessionId = session.getId();
+//        sessions.put(sessionId, session);
+//
+//        // Handle incoming messages and broadcast them to other clients
+//        return session.receive()
+//                .flatMap(message ->
+//                        // Broadcast the message to all other clients
+//                        Flux.fromIterable(sessions.values())
+//                                .filter(s -> !s.getId().equals(sessionId))
+//                                .flatMap(s -> s.send(Mono.just(message)))
+//                                .then() // Convert Flux<Void> to Mono<Void>
+//                )
+//                .doFinally(signalType -> sessions.remove(sessionId)).then();
+//    }
+//}

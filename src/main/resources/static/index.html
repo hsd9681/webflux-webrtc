@@ -1,0 +1,56 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>WebSocket Test</title>
+</head>
+<body>
+<h1>WebSocket Test</h1>
+<button onclick="connect()">Connect</button>
+<button onclick="disconnect()">Disconnect</button>
+<input type="text" id="messageInput" placeholder="Enter message">
+<button onclick="sendMessage()">Send Message</button>
+<div id="messages"></div>
+
+<script>
+    let socket;
+
+    function connect() {
+        socket = new WebSocket("ws://localhost:8080/signal");
+
+        socket.onopen = function(event) {
+            document.getElementById("messages").innerHTML += "<p>Connected</p>";
+        };
+
+        socket.onmessage = function(event) {
+            document.getElementById("messages").innerHTML += "<p>Received: " + event.data + "</p>";
+        };
+
+        socket.onclose = function(event) {
+            document.getElementById("messages").innerHTML += "<p>Disconnected</p>";
+        };
+
+        socket.onerror = function(error) {
+            document.getElementById("messages").innerHTML += "<p>Error: " + error.message + "</p>";
+        };
+    }
+
+    function disconnect() {
+        if (socket) {
+            socket.close();
+        }
+    }
+
+    function sendMessage() {
+        const message = document.getElementById("messageInput").value;
+        if (socket && socket.readyState === WebSocket.OPEN) {
+            socket.send(message);
+            document.getElementById("messages").innerHTML += "<p>Sent: " + message + "</p>";
+        } else {
+            alert("WebSocket is not connected.");
+        }
+    }
+</script>
+</body>
+</html>
