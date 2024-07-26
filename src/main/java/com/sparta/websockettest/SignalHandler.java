@@ -22,17 +22,16 @@ public class SignalHandler implements WebSocketHandler {
         Mono<Void> input = session.receive()
                 .map(WebSocketMessage::getPayloadAsText)
                 .flatMap(message -> {
-                    // Create a Flux from all sessions excluding the current one
+                    // Broadcast received message to all other sessions
                     Flux<WebSocketMessage> outboundFlux = Flux.fromIterable(sessions.values())
                             .filter(WebSocketSession::isOpen)
                             .filter(s -> !s.getId().equals(session.getId()))
                             .map(s -> s.textMessage(message));
 
-                    // Send the message to all other sessions
                     return Flux.fromIterable(sessions.values())
                             .filter(WebSocketSession::isOpen)
                             .filter(s -> !s.getId().equals(session.getId()))
-                            .flatMap(s -> s.send(Mono.just(session.textMessage(message))))
+                            .flatMap(s -> s.send(outboundFlux))
                             .then();
                 })
                 .doFinally(signalType -> sessions.remove(session.getId()))

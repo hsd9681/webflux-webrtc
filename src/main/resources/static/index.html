@@ -3,36 +3,50 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>WebSocket Test</title>
+    <title>WebRTC Test</title>
 </head>
 <body>
-<h1>WebSocket Test</h1>
+<h1>WebRTC Test</h1>
 <button onclick="connect()">Connect</button>
 <button onclick="disconnect()">Disconnect</button>
-<input type="text" id="messageInput" placeholder="Enter message">
-<button onclick="sendMessage()">Send Message</button>
-<div id="messages"></div>
+<button onclick="startCall()">Start Call</button>
+<button onclick="endCall()">End Call</button>
+<video id="localVideo" autoplay muted></video>
+<video id="remoteVideo" autoplay></video>
 
 <script>
     let socket;
+    let localStream;
+    let remoteStream;
+    let peerConnection;
+    const configuration = { iceServers: [{ urls: 'stun:stun.l.google.com:19302' }] };
+    const localVideo = document.getElementById('localVideo');
+    const remoteVideo = document.getElementById('remoteVideo');
 
     function connect() {
         socket = new WebSocket("ws://localhost:8080/signal");
 
         socket.onopen = function(event) {
-            document.getElementById("messages").innerHTML += "<p>Connected</p>";
+            console.log("WebSocket connected");
         };
 
         socket.onmessage = function(event) {
-            document.getElementById("messages").innerHTML += "<p>Received: " + event.data + "</p>";
+            const message = JSON.parse(event.data);
+            if (message.offer) {
+                handleOffer(message.offer);
+            } else if (message.answer) {
+                handleAnswer(message.answer);
+            } else if (message.iceCandidate) {
+                handleNewICECandidate(message.iceCandidate);
+            }
         };
 
         socket.onclose = function(event) {
-            document.getElementById("messages").innerHTML += "<p>Disconnected</p>";
+            console.log("WebSocket disconnected");
         };
 
         socket.onerror = function(error) {
-            document.getElementById("messages").innerHTML += "<p>Error: " + error.message + "</p>";
+            console.error("WebSocket error: ", error);
         };
     }
 
@@ -40,16 +54,73 @@
         if (socket) {
             socket.close();
         }
+        if (peerConnection) {
+            peerConnection.close();
+        }
     }
 
-    function sendMessage() {
-        const message = document.getElementById("messageInput").value;
-        if (socket && socket.readyState === WebSocket.OPEN) {
-            socket.send(message);
-            document.getElementById("messages").innerHTML += "<p>Sent: " + message + "</p>";
-        } else {
-            alert("WebSocket is not connected.");
+    function startCall() {
+        navigator.mediaDevices.getUserMedia({ video: true, audio: true })
+            .then(stream => {
+                localStream = stream;
+                localVideo.srcObject = localStream;
+                initPeerConnection();
+                peerConnection.addStream(localStream);
+                peerConnection.createOffer()
+                    .then(offer => peerConnection.setLocalDescription(offer))
+                    .then(() => {
+                        socket.send(JSON.stringify({ offer: peerConnection.localDescription }));
+                    });
+            })
+            .catch(error => console.error("Error accessing media devices.", error));
+    }
+
+    function endCall() {
+        if (peerConnection) {
+            peerConnection.close();
+            peerConnection = null;
         }
+        remoteVideo.srcObject = null;
+    }
+
+    function initPeerConnection() {
+        peerConnection = new RTCPeerConnection(configuration);
+        peerConnection.onicecandidate = event => {
+            if (event.candidate) {
+                socket.send(JSON.stringify({ iceCandidate: event.candidate }));
+            }
+        };
+        peerConnection.ontrack = event => {
+            remoteStream = event.streams[0];
+            remoteVideo.srcObject = remoteStream;
+        };
+    }
+
+    function handleOffer(offer) {
+        initPeerConnection();
+        peerConnection.setRemoteDescription(new RTCSessionDescription(offer))
+            .then(() => navigator.mediaDevices.getUserMedia({ video: true, audio: true }))
+            .then(stream => {
+                localStream = stream;
+                localVideo.srcObject = localStream;
+                peerConnection.addStream(localStream);
+                return peerConnection.createAnswer();
+            })
+            .then(answer => peerConnection.setLocalDescription(answer))
+            .then(() => {
+                socket.send(JSON.stringify({ answer: peerConnection.localDescription }));
+            })
+            .catch(error => console.error("Error handling offer.", error));
+    }
+
+    function handleAnswer(answer) {
+        peerConnection.setRemoteDescription(new RTCSessionDescription(answer))
+            .catch(error => console.error("Error setting remote description.", error));
+    }
+
+    function handleNewICECandidate(candidate) {
+        peerConnection.addIceCandidate(new RTCIceCandidate(candidate))
+            .catch(error => console.error("Error adding ICE candidate.", error));
     }
 </script>
 </body>
